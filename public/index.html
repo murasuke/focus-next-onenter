@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>JS QR Code Reader</title>
+    <title>move focus on enter event</title>
     <meta name="description" content="move focus on enter event" />
   </head>
   <body>
@@ -14,9 +14,11 @@
           <td>
             <input type="text" value="no tabindex" />
           </td>
-          <td>
-            
+          <td>            
             <input type="text" tabindex="1" value="tabindex is 1" />
+          </td>
+          <td>            
+            <a href="" >no tabindex</a>
           </td>
         </tr>
         <tr>
@@ -26,6 +28,9 @@
           <td>
             <input type="text" tabindex="-1" value="tabindex is -1" />
           </td>
+          <td>            
+            <textarea>tabindex is blank</textarea>
+          </td>
         </tr>
         <tr>
           <td>
@@ -33,6 +38,9 @@
           </td>
           <td>
             <input type="text" tabindex="3" value="tabindex is 3" />
+          </td>
+          <td tabindex="3">
+            <p tabindex="2">&lt;p&gt; tabindex is 2&lt;/p&gt;</p>  
           </td>
         </tr>
         <tr>
@@ -42,6 +50,9 @@
           <td>
             <input type="text" tabindex="3" value="tabindex is 3" />
           </td>
+          <td>            
+            <input type="text" tabindex="" value="tabindex is blank" />
+          </td>
         </tr>
         <tr>
           <td>
@@ -50,26 +61,44 @@
           <td>
             <input type="button" value="no tabindex" />
           </td>
+          <td>            
+            <input type="button" tabindex="" value="tabindex is blank" />
+          </td>
         </tr>
       </table>
     </form>
     <pre>
-      ①tabindex(1以上)の順に移動 ⇒ 最大まで行ったらtabindex未指定をDOM出現に移動 ⇒ URL入力欄に移動
-      ②同じtabindexが複数ある場合はDOM出現順に移動
-      ③tabindex=0は未指定と同じ
-      ④tabindexがマイナスの項目にフォーカスがある場合、次項目はDOM出現順に移動可能な項目へ移動
-      ⑤移動可能：tabindex指定なし、もしくは0以上
+  フォーカスを持つことが可能なタグ
+    ・input, button, select, textarea, a
+     ※上記以外でも、tabindex属性をつければフォーカス移動対象となる
+
+     ・下記のように入れ子になっている場合、両方がフォーカス移動対象(tabindex順)
+     　⇒&lt;td tabindex="2"&gt;&lt;input type="" tabindex="1" &gt;&lt;/td&gt;
+  ①tabindex(1以上)の順に移動 ⇒ 最大まで行ったらtabindex未指定をDOM出現に移動 ⇒ URL入力欄に移動
+  ②同じtabindexが複数ある場合はDOM出現順に移動
+  ③tabindex=0は未指定と同じ
+  ④tabindexがマイナスの項目にフォーカスがある場合、次項目はDOM出現順に移動可能な項目へ移動
+  ⑤移動可能：tabindex指定なし、もしくは0以上
+
+  ・anchorには移動しない（Enterでリンク先へ移動してしまうので）
     </pre>
     <script>
-        // NodeList of applicable inputs, select, button
-        let NodesArray = document.querySelectorAll(`
+        // フォーカス可能なElementと、tabindex属性があるElementを一括で取得する
+        //  (tabindexがあると、フォーカスを持つことができるため対象とする)
+        const selectArray = document.querySelectorAll(`
                           #form input:not([disabled])[type]:not([type=\"hidden\"]),
                           #form select:not([disabled]),
-                          #form button:not([disabled])[type=\"submit\"]
+                          #form button:not([disabled])[type=\"submit\"],
+                          #form textarea:not([disabled]),
+                          #form [tabindex]
         `);
-          
-        let array = Array.prototype.slice.call(NodesArray);
-        let sorted = array.sort((a,b) => {
+        
+        // querySelectorAll()の戻り値は配列ではない。使いやすくするためarrayに変換。
+        const nodeArray = Array.prototype.slice.call(selectArray);
+
+        // sortは破壊的メソッドのためspread構文でコピーする
+        // tabindex順に並び替え(指定がないElementは後ろに回す)
+        const tabSortedArray = [...nodeArray].sort((a,b) => {
           if(a.tabIndex && b.tabIndex) {
             const aIdx = parseInt(a.tabIndex);
             const bIdx = parseInt(b.tabIndex);
@@ -93,34 +122,43 @@
 
           // Node and NextNode are Elements.
           // You can update and get data if you want
-          Object.keys(NodesObject).forEach(i => (({ Node, NextNode }) => {
+          Object.keys(NodesObject).forEach(i => (({ node, nextNode }) => {
 
             // Break if we dont have a NextNode
-            if (NextNode === false) return;
+            if (nextNode === false) return;
 
 
-            Node.addEventListener('keypress', KeyboardEvent => {
+            node.addEventListener('keypress', keyEvent => {
 
               // Only continue if event.key was "Enter"
-              if (KeyboardEvent.key !== "Enter") return;
+              if (keyEvent.key !== "Enter") return;
 
               // Dont submit, thx
-              KeyboardEvent.preventDefault();
+              keyEvent.preventDefault();
+              // 入れ子になっている場合、複数回イベントが呼ばれないようにするため
+              keyEvent.stopPropagation();
+
+              if (keyEvent.target.tabIndex && parseInt(keyEvent.target.tabIndex, 10) < 0 ) {
+                // targetのtabindexがマイナスの場合
+                // Dom上の次のフォーカス移動可能なElementへ移動
+                const elemIndex = nodeArray.findIndex( element => element === keyEvent.target);
+                nodeArray[elemIndex+1].focus();
+                return;
+              } 
 
               // Do the thing
-              NextNode.focus();
+              nextNode.focus();
 
               // Not all elements have a select method
-              if (typeof NextNode.select === 'function') NextNode.select();
+              if (typeof nextNode.select === 'function') nextNode.select();
             });
 
-
           })({
-            Node:     NodesObject[i],
-            NextNode: NodesObject[(parseInt(i) + 1)] ?? false
+            node:     NodesObject[i],
+            nextNode: NodesObject[(parseInt(i) + 1)] ?? false
           }));
 
-        })({ ...sorted });
+        })({ ...tabSortedArray });
     </script>
       
   </body>
