@@ -48,7 +48,7 @@
             <input type="text" value="no tabindex" />
           </td>
           <td>
-            <input type="text" tabindex="3" value="tabindex is 3" />
+            <input type="text" tabindex="3" value="tabindex is 3" hidden />
           </td>
           <td>            
             <input type="text" tabindex="" value="tabindex is blank" />
@@ -59,10 +59,28 @@
             <input type="button" tabindex="2" value="tabindex is 2"/>
           </td>
           <td>
-            <input type="button" value="no tabindex" />
+            <input type="button" value="no tabindex" disabled />
           </td>
           <td>            
             <input type="button" tabindex="" value="tabindex is blank" />
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <input type="radio" name="radio" tabindex="2" value="tabindex is 2"/>
+            <input type="radio" name="radio1" tabindex="2" value="tabindex is 2" checked/>
+            <input type="radio" name="radio" tabindex="2" value="tabindex is 2"/>
+          </td>
+          <td>
+            <select>
+              <option value="dog">Dog</option>
+              <option value="cat">Cat</option>
+            </select>
+          </td>
+          <td>            
+            <input type="checkbox"  tabindex="2" value="tabindex is 2"/>
+            <input type="checkbox"  tabindex="2" value="tabindex is 2" checked/>
+            <input type="checkbox"  tabindex="2" value="tabindex is 2"/>
           </td>
         </tr>
       </table>
@@ -83,16 +101,42 @@
   ・anchorには移動しない（Enterでリンク先へ移動してしまうので）
     </pre>
     <script>
+
+      const enterHandler = ({ prevNode, node, nextNode }) => {
+        node.addEventListener('keypress', keyEvent => {
+          // Only continue if event.key was "Enter"
+          if (keyEvent.key !== "Enter") return;
+
+          const nextTarget = keyEvent.shiftKey ? prevNode : nextNode;
+          if (!nextTarget) return;
+          
+          // Don't submit
+          keyEvent.preventDefault();
+          // To prevent multiple calls to events when they are nested
+          keyEvent.stopPropagation();
+
+          // Do the thing
+          nextTarget.focus();
+
+          // Not all elements have a select method
+          if (typeof nextTarget.select === 'function') nextTarget.select();
+        });
+      };
+
+
       document.addEventListener('DOMContentLoaded', () => {
         // フォーカス可能なElementと、tabindex属性があるElementを一括で取得する
         //  (tabindexがあると、フォーカスを持つことができるため対象とする)
         const nodeList = document.querySelectorAll(`
-          #form input:not([disabled])[type]:not([type=\"hidden\"]),
-          #form select:not([disabled]),
-          #form button:not([disabled])[type=\"submit\"],
-          #form textarea:not([disabled]),
-          #form [tabindex]
+          #form input:not([disabled])[type]:not([type=\"hidden\"]):not([hidden]),
+          #form select:not([disabled]):not([hidden]),
+          #form button:not([disabled])[type=\"submit\"]:not([hidden]),
+          #form textarea:not([disabled]):not([hidden]),
+          #form [tabindex]:not([disabled]):not([hidden])
         `);
+        // const nodeList = document.querySelectorAll(`
+        //   #form input:not([disabled])[type]:not([type="hidden"]):not([hidden])
+        // `);
         
         // The return value of querySelectorAll() is not an array. Converted to array for ease of use.
         const nodeArray = Array.prototype.slice.call(nodeList);
@@ -110,45 +154,20 @@
           return 0;
         });
 
-        const nonNegativeArray = [...tabSortedArray].filter( item => item.tabIndex > 0);
+        const positiveveArray = [...tabSortedArray].filter( item => item.tabIndex >= 0);
+        const negativeArray = [...tabSortedArray].filter( item => item.tabIndex < 0);
 
-        tabSortedArray.forEach( (node, i, array) => (({ prevNode, node, nextNode }) => {
-          // Break if we dont have a NextNode
-          if (nextNode === false) return;
-            node.addEventListener('keypress', keyEvent => {
-
-              // Only continue if event.key was "Enter"
-              if (keyEvent.key !== "Enter") return;
-
-              // Don't submit
-              keyEvent.preventDefault();
-              // To prevent multiple calls to events when they are nested
-              keyEvent.stopPropagation();
-
-              let nextTarget = nextNode;
-              let direction = 1;
-              if (keyEvent.shiftKey) {
-                nextTarget = prevNode;
-                direction = -1;
-              } 
-
-              if ( keyEvent.target.tabIndex < 0) {
-                // If tabindex is negative, focus on next dom element that can have focus
-                const elemIndex = nodeArray.findIndex(element => element === keyEvent.target);
-                nodeArray[elemIndex + direction].focus();
-                return;
-              }
-
-              // Do the thing
-              nextTarget.focus();
-
-              // Not all elements have a select method
-              if (typeof nextTarget.select === 'function') nextTarget.select();
-            });
-          })({
-            prevNode: ((array[i - 1] ?? array.slice(-1)[0]).tabIndex < 0) ? array.slice(-1)[0] : array[i - 1],
+        positiveveArray.forEach( (node, i, array) => enterHandler({
+            prevNode: array[i - 1] ?? array.slice(-1)[0],
             node,
-            nextNode: array[i + 1] ?? array.find(item => item.tabIndex > 0),
+            nextNode: array[i + 1] ?? array[0],
+          })
+        );
+
+        negativeArray.forEach((node, i, array) => enterHandler({
+            prevNode: nodeArray[nodeArray.findIndex(element => element === node) - 1] ?? positiveveArray.slice(-1)[0],
+            node,
+            nextNode: nodeArray[nodeArray.findIndex(element => element === node) + 1] ?? positiveveArray[0],
           })
         );
       });
