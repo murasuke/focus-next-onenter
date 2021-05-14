@@ -83,82 +83,75 @@
   ・anchorには移動しない（Enterでリンク先へ移動してしまうので）
     </pre>
     <script>
+      document.addEventListener('DOMContentLoaded', () => {
         // フォーカス可能なElementと、tabindex属性があるElementを一括で取得する
         //  (tabindexがあると、フォーカスを持つことができるため対象とする)
-        const selectArray = document.querySelectorAll(`
-                          #form input:not([disabled])[type]:not([type=\"hidden\"]),
-                          #form select:not([disabled]),
-                          #form button:not([disabled])[type=\"submit\"],
-                          #form textarea:not([disabled]),
-                          #form [tabindex]
+        const nodeList = document.querySelectorAll(`
+          #form input:not([disabled])[type]:not([type=\"hidden\"]),
+          #form select:not([disabled]),
+          #form button:not([disabled])[type=\"submit\"],
+          #form textarea:not([disabled]),
+          #form [tabindex]
         `);
         
-        // querySelectorAll()の戻り値は配列ではない。使いやすくするためarrayに変換。
-        const nodeArray = Array.prototype.slice.call(selectArray);
+        // The return value of querySelectorAll() is not an array. Converted to array for ease of use.
+        const nodeArray = Array.prototype.slice.call(nodeList);
 
-        // sortは破壊的メソッドのためspread構文でコピーする
-        // tabindex順に並び替え(指定がないElementは後ろに回す)
+        // Sort is a destructive method, so copy by spread Syntax
+        // Sort by tabindex (move backwards for unspecified Elements)
         const tabSortedArray = [...nodeArray].sort((a,b) => {
           if(a.tabIndex && b.tabIndex) {
-            const aIdx = parseInt(a.tabIndex);
-            const bIdx = parseInt(b.tabIndex);
-            if( aIdx < bIdx ) return -1;
-            if( aIdx > bIdx ) return 1;
-            return 0;
-          }
-
-          if(a.tabIndex && !b.tabIndex) {
+            return a.tabIndex - b.tabIndex; 
+          } else if(a.tabIndex && !b.tabIndex) {
             return -1;
-          }
-          if(!a.tabIndex && b.tabIndex) {
+          } else if(!a.tabIndex && b.tabIndex) {
             return 1;
           }
           return 0;
         });
 
-        // Spread the array to an object so we can load the next node without 
-        // keeping track of indexes (barf)
-        (NodesObject => {
+        const nonNegativeArray = [...tabSortedArray].filter( item => item.tabIndex > 0);
 
-          // Node and NextNode are Elements.
-          // You can update and get data if you want
-          Object.keys(NodesObject).forEach(i => (({ node, nextNode }) => {
-
-            // Break if we dont have a NextNode
-            if (nextNode === false) return;
-
-
+        tabSortedArray.forEach( (node, i, array) => (({ prevNode, node, nextNode }) => {
+          // Break if we dont have a NextNode
+          if (nextNode === false) return;
             node.addEventListener('keypress', keyEvent => {
 
               // Only continue if event.key was "Enter"
               if (keyEvent.key !== "Enter") return;
 
-              // Dont submit, thx
+              // Don't submit
               keyEvent.preventDefault();
-              // 入れ子になっている場合、複数回イベントが呼ばれないようにするため
+              // To prevent multiple calls to events when they are nested
               keyEvent.stopPropagation();
 
-              if (keyEvent.target.tabIndex && parseInt(keyEvent.target.tabIndex, 10) < 0 ) {
-                // targetのtabindexがマイナスの場合
-                // Dom上の次のフォーカス移動可能なElementへ移動
-                const elemIndex = nodeArray.findIndex( element => element === keyEvent.target);
-                nodeArray[elemIndex+1].focus();
-                return;
+              let nextTarget = nextNode;
+              let direction = 1;
+              if (keyEvent.shiftKey) {
+                nextTarget = prevNode;
+                direction = -1;
               } 
 
+              if ( keyEvent.target.tabIndex < 0) {
+                // If tabindex is negative, focus on next dom element that can have focus
+                const elemIndex = nodeArray.findIndex(element => element === keyEvent.target);
+                nodeArray[elemIndex + direction].focus();
+                return;
+              }
+
               // Do the thing
-              nextNode.focus();
+              nextTarget.focus();
 
               // Not all elements have a select method
-              if (typeof nextNode.select === 'function') nextNode.select();
+              if (typeof nextTarget.select === 'function') nextTarget.select();
             });
-
           })({
-            node:     NodesObject[i],
-            nextNode: NodesObject[(parseInt(i) + 1)] ?? false
-          }));
-
-        })({ ...tabSortedArray });
+            prevNode: ((array[i - 1] ?? array.slice(-1)[0]).tabIndex < 0) ? array.slice(-1)[0] : array[i - 1],
+            node,
+            nextNode: array[i + 1] ?? array.find(item => item.tabIndex > 0),
+          })
+        );
+      });
     </script>
       
   </body>
