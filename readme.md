@@ -2,6 +2,17 @@
 
 [テストページ](https://murasuke.github.io/focus-next-onenter/public/index.html)
 
+## 使い方
+
+focusOnEnter.jsを読み込み、ロード時に実行する。
+```html
+<scritpt src="./focusOnEnter.js"></scritpt>
+<script type="module">
+  import { focusNextElementOnEnter } from './focusOnEnter.js';
+  window.addEventListener('load', () => focusNextElementOnEnter());
+</script>    
+```
+
 ## フォーカス移動の仕様(手で動かしながら調べたので違っているかも)
 1. input, button, select, textarea, aがフォーカス移動可能なelement
 1. 上記以外でも、tabindex属性を与えると移動対象となる
@@ -28,8 +39,6 @@
 * フォーカス前後をロード時に確定(radioボタン以外)するため、動的に追加したelementやdisabledの切替に対応していない
 ## 参考資料
 https://html.spec.whatwg.org/multipage/interaction.html#sequential-focus-navigation
-
-
 
 
 
